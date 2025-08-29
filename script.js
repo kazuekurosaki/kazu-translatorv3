@@ -165,7 +165,7 @@ const uiTranslations = {
 // Teks contoh untuk berbagai bahasa
 const sampleTexts = {
     "JP": "吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。",
-    "KR": "나는 고양이로소이다. 이름은 아직 없다. 어디에서 태어났는지 전혀 짐작이 안 간다. 다만 어둡고 축축한 곳에서 야옹야옹 울고 있던 것만은 기억하고 있다.",
+    "KR": "나는 고양이로소이다. 이름은 아직 없다. 어디에서 태어났는지 전혀 짐작이 안 간다. 다만 어둡고 축축한 곳에서 야옹야옹 울고 있던 것만은 기억하고 있다。",
     "CN": "我是猫。名字还没有。出生在哪里一点都估计不到。只记得在阴暗潮湿的地方喵喵地哭过。",
     "EN": "I am a cat. I don't have a name yet. I have no idea where I was born. I only remember meowing in a dark, damp place.",
     "ID": "Saya adalah kucing. Belum punya nama. Sama sekali tidak tahu di mana saya dilahirkan. Saya hanya ingat mengeong di tempat yang gelap dan lembab."
@@ -265,7 +265,7 @@ const naturalizationRules = {
             {from: /\bconstruct\b/gi, to: 'build'},
             {from: /\bfabricate\b/gi, to: 'make'},
             
-                        // Sentence structures
+            // Sentence structures
             {from: /\bin order to\b/gi, to: 'to'},
             {from: /\bwith regard to\b/gi, to: 'about'},
             {from: /\bdue to the fact that\b/gi, to: 'because'},
@@ -419,6 +419,134 @@ const naturalizationRules = {
     }
 };
 
+// Fungsi untuk memperbaiki kapitalisasi teks
+function fixCapitalization(text) {
+    if (!text || text.length === 0) return text;
+    
+    // Pisahkan teks menjadi kalimat-kalimat
+    const sentences = text.split(/([.!?]+\s*)/);
+    let result = '';
+    
+    for (let i = 0; i < sentences.length; i++) {
+        let sentence = sentences[i];
+        
+        // Jika ini adalah pemisah kalimat (., !, ?), tambahkan ke hasil dan lanjutkan
+        if (/[.!?]+\s*$/.test(sentence) && i < sentences.length - 1) {
+            result += sentence;
+            continue;
+        }
+        
+        // Jika kalimat kosong, lanjutkan
+        if (sentence.trim().length === 0) {
+            result += sentence;
+            continue;
+        }
+        
+        // Kapitalisasi huruf pertama kalimat
+        let formattedSentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+        
+        // Perbaiki kapitalisasi "i" menjadi "I" dalam bahasa Inggris
+        if (document.getElementById('target-language').value === 'en') {
+            formattedSentence = formattedSentence.replace(/\bi\b/g, 'I');
+        }
+        
+        result += formattedSentence;
+    }
+    
+    return result;
+}
+
+// Fungsi untuk mendeteksi dan mempertahankan pola kapitalisasi asli
+function preserveCapitalization(originalText, translatedText) {
+    if (!originalText || !translatedText) return translatedText;
+    
+    // Deteksi jika teks asli seluruhnya huruf besar
+    if (originalText === originalText.toUpperCase()) {
+        return translatedText.toUpperCase();
+    }
+    
+    // Deteksi jika teks asli seluruhnya huruf kecil
+    if (originalText === originalText.toLowerCase()) {
+        return translatedText.toLowerCase();
+    }
+    
+    // Deteksi jika teks asli menggunakan title case (setiap kata dimulai dengan huruf besar)
+    const words = originalText.split(/\s+/);
+    const isTitleCase = words.length > 1 && words.every(word => {
+        if (word.length === 0) return true;
+        const firstChar = word[0];
+        return firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase();
+    });
+    
+    if (isTitleCase) {
+        return translatedText.split(/\s+/).map(word => {
+            if (word.length === 0) return word;
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }).join(' ');
+    }
+    
+    return translatedText;
+}
+
+// Fungsi untuk memperbaiki spasi sekitar tanda baca
+function fixPunctuationSpacing(text) {
+    if (!text) return text;
+    
+    // Perbaiki spasi sebelum tanda baca
+    let formattedText = text
+        .replace(/\s+([.,!?;:])/g, '$1') // Hapus spasi sebelum tanda baca
+        .replace(/([.,!?;:])([A-Za-z0-9])/g, '$1 $2'); // Tambahkan spasi setelah tanda baca jika tidak ada
+    
+    // Perbaiki spasi sekitar tanda kutip
+    formattedText = formattedText
+        .replace(/\s+(["'])\s*/g, '$1') // Spasi sebelum kutip
+        .replace(/(["'])\s+/g, '$1'); // Spasi setelah kutip
+    
+    return formattedText;
+}
+
+// Fungsi untuk menangani kasus khusus seperti singkatan
+function handleSpecialCases(text, targetLang) {
+    if (!text) return text;
+    
+    let formattedText = text;
+    
+    // Daftar singkatan umum yang tidak boleh diubah
+    const abbreviations = {
+        'en': ['Mr.', 'Mrs.', 'Dr.', 'Prof.', 'etc.', 'e.g.', 'i.e.', 'vs.', 'Jan.', 'Feb.', 'Mar.'],
+        'id': ['Tn.', 'Ny.', 'Dr.', 'Prof.', 'dll.', 'dkk.', 'dst.', 'dgn.', 'yg.', 'dpt.'],
+        'ja': ['さん', '様', '先生', '博士'],
+        'ko': ['씨', '님', '선생', '박사'],
+        'zh': ['先生', '女士', '博士', '教授']
+    };
+    
+    // Untuk setiap bahasa, lindungi singkatan dari perubahan kapitalisasi
+    if (abbreviations[targetLang]) {
+        abbreviations[targetLang].forEach(abbr => {
+            const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+            formattedText = formattedText.replace(regex, abbr);
+        });
+    }
+    
+    // Perbaiki kapitalisasi untuk nama bulan dan hari (bahasa Inggris)
+    if (targetLang === 'en') {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        months.forEach(month => {
+            const regex = new RegExp(`\\b${month.toLowerCase()}\\b`, 'g');
+            formattedText = formattedText.replace(regex, month);
+        });
+        
+        days.forEach(day => {
+            const regex = new RegExp(`\\b${day.toLowerCase()}\\b`, 'g');
+            formattedText = formattedText.replace(regex, day);
+        });
+    }
+    
+    return formattedText;
+}
+
 // Fungsi untuk membuat terjemahan lebih natural
 function naturalizeTranslation(text, targetLang, style) {
     if (style === 'formal') {
@@ -517,6 +645,18 @@ async function callTranslationAPI(provider, text, sourceLang, targetLang, apiKey
     if (provider !== 'openai' && provider !== 'claude' && provider !== 'gemini') {
         translatedText = naturalizeTranslation(translatedText, targetLang, translationStyle);
     }
+    
+    // Pertahankan pola kapitalisasi dari teks asli
+    translatedText = preserveCapitalization(text, translatedText);
+    
+    // Perbaiki kapitalisasi kalimat
+    translatedText = fixCapitalization(translatedText);
+    
+    // Perbaiki spasi tanda baca
+    translatedText = fixPunctuationSpacing(translatedText);
+    
+    // Tangani kasus khusus seperti singkatan
+    translatedText = handleSpecialCases(translatedText, targetLang);
     
     return translatedText;
 }
@@ -675,6 +815,94 @@ async function translateWithGemini(text, sourceLang, targetLang, apiKey, style =
     }
 }
 
+async function translateWithGoogle(text, sourceLang, targetLang) {
+    // Google Translate API (menggunakan endpoint publik)
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data[0].map(item => item[0]).join('');
+    } catch (error) {
+        console.error('Google Translate error:', error);
+        throw new Error(uiTranslations[currentUILang].api_error + error.message);
+    }
+}
+
+async function translateWithDeepL(text, sourceLang, targetLang, apiKey) {
+    if (!apiKey) {
+        throw new Error(uiTranslations[currentUILang].api_key_required);
+    }
+    
+    // DeepL API
+    const url = 'https://api-free.deepl.com/v2/translate';
+    const params = new URLSearchParams({
+        auth_key: apiKey,
+        text: text,
+        source_lang: sourceLang.toUpperCase(),
+        target_lang: targetLang.toUpperCase()
+    });
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.translations[0].text;
+    } catch (error) {
+        console.error('DeepL API error:', error);
+        throw new Error(uiTranslations[currentUILang].api_error + error.message);
+    }
+}
+
+async function translateWithMicrosoft(text, sourceLang, targetLang, apiKey) {
+    if (!apiKey) {
+        throw new Error(uiTranslations[currentUILang].api_key_required);
+    }
+    
+    // Microsoft Translator API
+    // Catatan: Untuk menggunakan API ini, Anda perlu membuat resource di Azure
+    const region = 'eastus'; // Ganti dengan region Anda
+    const url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=${sourceLang}&to=${targetLang}`;
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Ocp-Apim-Subscription-Key': apiKey,
+                'Ocp-Apim-Subscription-Region': region,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify([{ Text: text }])
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data[0].translations[0].text;
+    } catch (error) {
+        console.error('Microsoft Translator API error:', error);
+        throw new Error(uiTranslations[currentUILang].api_error + error.message);
+    }
+}
+
 // Variabel global
 let currentUILang = "ID";
 
@@ -824,6 +1052,17 @@ async function startTranslation() {
     document.getElementById('progress-text').textContent = uiTranslations[currentUILang].translating;
     document.getElementById('status-bar').textContent = uiTranslations[currentUILang].translating;
     
+    // Simulasi progress bar
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 2;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+        
+        if (progress >= 100) {
+            clearInterval(progressInterval);
+        }
+    }, 50);
+    
     try {
         // Panggil API berdasarkan provider yang dipilih
         const translatedText = await callTranslationAPI(apiProvider, sourceText, sourceLang, targetLang, apiKey);
@@ -842,94 +1081,6 @@ async function startTranslation() {
         document.getElementById('progress-container').style.display = 'none';
         document.getElementById('translate-btn').disabled = false;
         updateCharCount();
-    }
-}
-
-async function translateWithGoogle(text, sourceLang, targetLang) {
-    // Google Translate API (menggunakan endpoint publik)
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-    
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data[0].map(item => item[0]).join('');
-    } catch (error) {
-        console.error('Google Translate error:', error);
-        throw new Error(uiTranslations[currentUILang].api_error + error.message);
-    }
-}
-
-async function translateWithDeepL(text, sourceLang, targetLang, apiKey) {
-    if (!apiKey) {
-        throw new Error(uiTranslations[currentUILang].api_key_required);
-    }
-    
-    // DeepL API
-    const url = 'https://api-free.deepl.com/v2/translate';
-    const params = new URLSearchParams({
-        auth_key: apiKey,
-        text: text,
-        source_lang: sourceLang.toUpperCase(),
-        target_lang: targetLang.toUpperCase()
-    });
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: params
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data.translations[0].text;
-    } catch (error) {
-        console.error('DeepL API error:', error);
-        throw new Error(uiTranslations[currentUILang].api_error + error.message);
-    }
-}
-
-async function translateWithMicrosoft(text, sourceLang, targetLang, apiKey) {
-    if (!apiKey) {
-        throw new Error(uiTranslations[currentUILang].api_key_required);
-    }
-    
-    // Microsoft Translator API
-    // Catatan: Untuk menggunakan API ini, Anda perlu membuat resource di Azure
-    const region = 'eastus'; // Ganti dengan region Anda
-    const url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=${sourceLang}&to=${targetLang}`;
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Ocp-Apim-Subscription-Key': apiKey,
-                'Ocp-Apim-Subscription-Region': region,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify([{ Text: text }])
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data[0].translations[0].text;
-    } catch (error) {
-        console.error('Microsoft Translator API error:', error);
-        throw new Error(uiTranslations[currentUILang].api_error + error.message);
     }
 }
 
